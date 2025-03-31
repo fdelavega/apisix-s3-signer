@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  etcd:
+    image: bitnami/etcd:3.5
+    container_name: etcd
+    environment:
+      - ALLOW_NONE_AUTHENTICATION=yes
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+    ports:
+      - "2379:2379"
+
+  apisix:
+    image: apache/apisix:3.11.0-debian
+    container_name: apisix
+    depends_on:
+      - etcd
+    volumes:
+      - ./config/apisix_config.yaml:/usr/local/apisix/conf/config.yaml
+      - ./plugins:/opt/apisix/plugins/apisix/plugins:ro
+    ports:
+      - "9080:9080"   # HTTP Gateway
+      - "9443:9443"   # HTTPS Gateway
+      - "9180:9180"   # Admin API
+
+  apisix-dashboard:
+    image: apache/apisix-dashboard:3.0.1-alpine
+    container_name: apisix-dashboard
+    depends_on:
+      - apisix
+    volumes:
+      - ./config/config.yaml:/usr/local/apisix-dashboard/conf/conf.yaml
+    ports:
+      - "9000:9000"  # Web UI

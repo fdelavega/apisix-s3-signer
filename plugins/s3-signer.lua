@@ -2,11 +2,12 @@
 
 local core = require("apisix.core")
 local cjson = require('cjson')
+local resty_hmac = require('resty.hmac')
 
 local resty_sha256 = require('resty.sha256')
 local str = require('resty.string')
 
-local hmac_sha256 = ngx.hmac_sha256
+-- local hmac_sha256 = ngx.hmac_sha256
 
 local plugin_name = "s3-signer"
 
@@ -40,29 +41,29 @@ local function get_iso8601_basic_short(timestamp)
 end
   
 local function get_derived_signing_key(keys, timestamp, region, service)
-    -- local h_date = resty_hmac:new('AWS4' .. keys['secret_key'], resty_hmac.ALGOS.SHA256)
-    -- h_date:update(get_iso8601_basic_short(timestamp))
-    -- k_date = h_date:final()
+    local h_date = resty_hmac:new('AWS4' .. keys['secret_key'], resty_hmac.ALGOS.SHA256)
+    h_date:update(get_iso8601_basic_short(timestamp))
+    local k_date = h_date:final()
 
-    local k_date = ngx.hmac_sha256("AWS4" .. keys["secret_key"], get_iso8601_basic_short(timestamp))
+    -- local k_date = ngx.hmac_sha256("AWS4" .. keys["secret_key"], get_iso8601_basic_short(timestamp))
 
-    -- local h_region = resty_hmac:new(k_date, resty_hmac.ALGOS.SHA256)
-    -- h_region:update(region)
-    -- k_region = h_region:final()
+    local h_region = resty_hmac:new(k_date, resty_hmac.ALGOS.SHA256)
+    h_region:update(region)
+    local k_region = h_region:final()
 
-    local k_region = ngx.hmac_sha256(k_date, region)
+    -- local k_region = ngx.hmac_sha256(k_date, region)
   
-    -- local h_service = resty_hmac:new(k_region, resty_hmac.ALGOS.SHA256)
-    -- h_service:update(service)
-    -- k_service = h_service:final()
+    local h_service = resty_hmac:new(k_region, resty_hmac.ALGOS.SHA256)
+    h_service:update(service)
+    local k_service = h_service:final()
 
-    local k_service = ngx.hmac_sha256(k_region, service)
+    -- local k_service = ngx.hmac_sha256(k_region, service)
   
-    -- local h = resty_hmac:new(k_service, resty_hmac.ALGOS.SHA256)
-    -- h:update('aws4_request')
-    -- return h:final()
+    local h = resty_hmac:new(k_service, resty_hmac.ALGOS.SHA256)
+    h:update('aws4_request')
+    return h:final()
 
-    return ngx.hmac_sha256(k_service, 'aws4_request')
+    --return ngx.hmac_sha256(k_service, 'aws4_request')
 end
   
 local function get_cred_scope(timestamp, region, service)
@@ -104,13 +105,13 @@ local function get_string_to_sign(timestamp, region, service, host, uri, body, m
 end
 
 local function get_signature(derived_signing_key, string_to_sign)
-    -- local h = resty_hmac:new(derived_signing_key, resty_hmac.ALGOS.SHA256)
-    -- h:update(string_to_sign)
-    -- return h:final(nil, true)
+    local h = resty_hmac:new(derived_signing_key, resty_hmac.ALGOS.SHA256)
+    h:update(string_to_sign)
+    return h:final(nil, true)
 
-    local signature_bin = ngx.hmac_sha256(derived_signing_key, string_to_sign)
-    local signature_hex = require("resty.string").to_hex(signature_bin)
-    return signature_hex
+    -- local signature_bin = ngx.hmac_sha256(derived_signing_key, string_to_sign)
+    -- local signature_hex = require("resty.string").to_hex(signature_bin)
+    -- return signature_hex
 end
   
 local function get_authorization(keys, timestamp, region, service, host, uri, body, method)
@@ -175,8 +176,9 @@ function _M.access(conf, ctx)
     -- Create signer input
     local signing_input = {
         method = req_method,
-        uri = core.request.get_full_path(),
+        uri = ngx.var.uri,
         headers = req_headers,
+        host = ctx.var.upstream_host,
         body = req_body,
         query = req_query,
         region = conf.region,

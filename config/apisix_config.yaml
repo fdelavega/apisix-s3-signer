@@ -1,8 +1,6 @@
 apisix:
   node_listen: 9080
   enable_admin: true
-  allow_admin:
-    - 0.0.0.0/0  # ⚠️ Allow all; secure in prod
   extra_lua_path: "/opt/apisix/plugins/?.lua"
 
 deployment:
@@ -14,6 +12,8 @@ deployment:
       - name: "admin"
         key: "admin123"
         role: admin
+    allow_admin:
+    - 0.0.0.0/0  # ⚠️ Allow all; secure in prod
 
 plugins:                           # plugin list (sorted by priority)
   - real-ip                        # priority: 23000
